@@ -1,0 +1,80 @@
+vocabulary V {
+    type cindex isa int		// Identifies coupons
+    type pindex isa int		// Identifies pizzas
+    type num isa int
+    n : pindex				// Total number of pizzas
+    m : cindex				// Total number of coupons
+    cost : num				// The cost of buying the pizzas
+    
+    price(pindex): num		// Each pizza has a price
+    buy(cindex)  : num		// We must buy a certain number of pizzas to use each coupon
+    free(cindex) : num		// Each coupon we use lets us get some number of free pizzas
+
+    Justifies(cindex,pindex)// Holds if pizza p is one of the pizzas purchased to justify using coupon c 
+    UsedFor(cindex,pindex)  // Holds if we are getting pizza p for free by using coupon c
+    
+    Paid(pindex)			// True if you paid for the pizza
+    Used(cindex)			// True if we used the coupon
+    
+    k : int 				// The cost bound (i.e amount of money we want to spend)
+    
+}
+
+
+theory T : V{  
+    // 1. We pay for exactly the pizzas we dont get for free by using coupons
+    ! p: Paid(p) <=> ~? c : UsedFor(c,p).
+    
+    
+    // 2. Used is the set of coupons we use
+    ! c: Used(c) <=> ? p : UsedFor(c,p).
+    
+    
+    // 3. Any coupon we use must be justified by enough free pizzas
+    ! c : Used(c) => #{p[pindex] : Justifies(c,p)} >= buy(c).
+    
+    
+    // 4. No coupon is used for too many free pizzas
+    ! c : Used(c) => #{p[pindex] : UsedFor(c,p)} =< free(c).
+
+    
+    // 5.Each free pizza cost at most as much as the cheapest pizza purchased to justify
+    //	 the coupon used
+    ! c[cindex] p1[pindex] p2[pindex] : UsedFor(c,p1) & Justifies(c,p2) => price(p1) =< price(p2).
+    
+    
+    // 6. We pay for all pizzas that justify using coupons
+    ! p c : Justifies(c,p) => Paid(p).
+    
+    
+    // 7. The total cost is not too high
+   	cost = sum{ p[pindex] : ~?v[cindex] : UsedFor(v,p) : price(p)}.
+    cost =< k.
+    
+    
+    // 8. Justifies and UsedFor only hold for coupon pairs
+    ! p c : Justifies(c,p) => ((1 =< c =< m) & (1 =< p =< n)).
+    ! p c : UsedFor(c,p) => ((1 =< c =< m) & (1 =< p =< n)).   
+
+
+    // 9. No pizza is used too justify many coupons (e.g. 1 pizza cant be applied to multiple coupons)
+    ! p : ?=<1 v : Justifies(v,p).
+}
+
+
+term t: V {
+	cost
+}
+
+
+vocabulary Vout {
+    extern V::cost/0:1
+    extern V::UsedFor/2
+    extern V::Justifies/2
+}
+
+
+procedure main(){
+    // Return the model with the least cost (if there is one that is less than k)
+    printmodels(minimize(T,S,t,Vout))
+}
